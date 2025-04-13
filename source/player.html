@@ -294,7 +294,7 @@
 </head>
 <body>
     <div class="c1">
-        <video id="main-video" preload="metadata"></video>
+        <video id="main-video" preload="metadata" loop></video>
 
         <div class="c2">
             <div class="c3" id="progress-container" role="slider" aria-label="Video progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
@@ -439,10 +439,19 @@
             }
 
             function updateProgress() {
-                if (isNaN(video.duration) || !isFinite(video.duration)) return;
-                const percent = (video.currentTime / video.duration) * 100;
+                // Handle potential NaN/Infinity during loading or if video ends abruptly
+                if (isNaN(video.duration) || !isFinite(video.duration) || isNaN(video.currentTime) || !isFinite(video.currentTime)) {
+                     progressBar.style.width = '0%';
+                     progressContainer.setAttribute('aria-valuenow', '0');
+                     timeDisplay.textContent = `${formatTime(0)} / ${formatTime(video.duration || 0)}`; // Show 0 / duration or 0 / 0
+                     return;
+                 }
+
+                // Prevent progress exceeding 100% slightly due to floating point
+                const percent = Math.min(100, (video.currentTime / video.duration) * 100);
                 progressBar.style.width = `${percent}%`;
                 progressContainer.setAttribute('aria-valuenow', percent.toFixed(2));
+
                 const currentTime = formatTime(video.currentTime);
                 const duration = formatTime(video.duration);
                 timeDisplay.textContent = `${currentTime} / ${duration}`;
@@ -570,18 +579,28 @@
                 playPauseBtn.setAttribute('aria-label', 'Pause');
             });
             video.addEventListener('pause', () => {
+              // Don't show play icon if video ended and is looping
+              if (!video.ended || !video.loop) {
                 playIcon.style.display = 'block';
                 pauseIcon.style.display = 'none';
                  // Classlist updated for obfuscated class
                 videoPlayer.classList.add('c9'); // was 'paused'
                 playPauseBtn.setAttribute('aria-label', 'Play');
+              }
             });
             video.addEventListener('timeupdate', updateProgress);
             video.addEventListener('volumechange', updateVolumeUI);
             video.addEventListener('ended', () => {
-                 playIcon.style.display = 'block';
-                 pauseIcon.style.display = 'none';
-                 playPauseBtn.setAttribute('aria-label', 'Play');
+                // If not looping, show play icon
+                 if (!video.loop) {
+                     playIcon.style.display = 'block';
+                     pauseIcon.style.display = 'none';
+                     playPauseBtn.setAttribute('aria-label', 'Play');
+                 }
+                 // If looping, the browser handles restarting automatically.
+                 // We might want to ensure the progress bar visually resets if needed,
+                 // although the 'timeupdate' event should handle this quickly.
+                 // updateProgress(); // Call explicitly if needed for instant visual reset
             });
             video.addEventListener('error', (e) => {
                  console.error("Video Error:", video.error);
